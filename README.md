@@ -43,12 +43,8 @@ Bulk - навал мусора -  скопление твердых бытовы
 ### Веса и датасеты
 
 Скачать веса можно по ссылке: 
-https://drive.google.com/file/d/1-60QynYKEl5oWNk_iY6o8AQaPYqhYh-i/view?usp=sharing
-https://drive.google.com/file/d/1bwvzj8EcUw4UnS8cPOYh700JvhTuUU89/view?usp=sharing
-https://drive.google.com/file/d/1-2ie2Q9XSa9MmgoPvsXt8Wd4ggsCP8hL/view?usp=sharing
-https://drive.google.com/drive/folders/15PXZqsluRT6qz-FOcjDlv2U5_9oJ80Qa?usp=sharing
-https://drive.google.com/drive/folders/1xvgKliAyQsej4wbZoKibj7GDHgC21dFd?usp=sharing
-https://drive.google.com/drive/folders/1wmupexnFrj5pGGNtp1by384a9dlgvMB7?usp=sharing
+https://drive.google.com/drive/folders/1ozJUmHe4ODd-OKXXdUHFid5iacqEMWkR?usp=sharing
+
 Веса включают в себя:
 
 1. Веса для yolov8.
