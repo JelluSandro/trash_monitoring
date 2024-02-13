@@ -1,0 +1,1 @@
+docker build -t fast_api_server_template .
