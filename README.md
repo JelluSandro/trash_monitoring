@@ -45,10 +45,6 @@ Bulk - навал мусора -  скопление твердых бытовы
 Скачать веса можно по ссылке: 
 https://drive.google.com/drive/folders/1ozJUmHe4ODd-OKXXdUHFid5iacqEMWkR?usp=sharing
 
-Веса включают в себя:
-
-1. Веса для yolov8.
-
 Скачать датасеты можно по ссылке: https://drive.google.com/drive/folders/1r4t4I91HpLBa3S_1x8i400TF3x0Q5KgI
 https://universe.roboflow.com/itmo-ognxn/russian-garbage-detection/dataset/
 https://universe.roboflow.com/itmo-ognxn/selfie-trash/dataset/

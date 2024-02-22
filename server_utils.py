@@ -6,10 +6,11 @@ import torch
 import cv2
 import base64
 import numpy as np
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 from torchvision import transforms
 from PIL import Image
+
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
@@ -19,6 +20,7 @@ transform_tests = transforms.Compose([
     transforms.ToTensor(),
     normalize
 ])
+
 async def files_to_batch(files: List[UploadFile], return_fnames=False, for_attr=False):
     all_files = []
     fnames = []
@@ -39,13 +41,19 @@ async def files_to_batch(files: List[UploadFile], return_fnames=False, for_attr=
 
     batch = []
     for image_bytes in all_files:
-        image = np.frombuffer(image_bytes, np.uint8)
-        image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-        if for_attr:
-            image = Image.fromarray(image)
-            batch.append(transform_tests(image).unsqueeze(0))
-        else:
-            batch.append(image)
+        try:
+            image = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+            if type(image) != NoneType:
+                if for_attr:
+                    image = Image.fromarray(image)
+                    batch.append(transform_tests(image).unsqueeze(0))
+                else:
+                    batch.append(image)
+        except:
+            continue
+    if len(batch) == 0:
+        raise HTTPException(status_code=404, detail="Images not found")
     if for_attr:
         batch = torch.cat(batch)
     if return_fnames:
@@ -53,7 +61,6 @@ async def files_to_batch(files: List[UploadFile], return_fnames=False, for_attr=
     return batch
     
 def normilise_batch_cv2(batch_pil):
-    #to do empty batch
     batch = []
     for img_pil in batch_pil:
         batch.append(transform_tests(img_pil).unsqueeze(0))
