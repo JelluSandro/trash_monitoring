@@ -10,6 +10,7 @@ from fastapi import UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 from torchvision import transforms
 from PIL import Image
+import os
 
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -44,12 +45,12 @@ async def files_to_batch(files: List[UploadFile], return_fnames=False, for_attr=
         try:
             image = np.frombuffer(image_bytes, np.uint8)
             image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-            if type(image) != NoneType:
-                if for_attr:
-                    image = Image.fromarray(image)
-                    batch.append(transform_tests(image).unsqueeze(0))
-                else:
-                    batch.append(image)
+            #if type(image) != NoneType:
+            if for_attr:
+                image = Image.fromarray(image)
+                batch.append(transform_tests(image).unsqueeze(0))
+            else:
+                batch.append(image)
         except:
             continue
     if len(batch) == 0:
@@ -95,20 +96,43 @@ def wrap_images_as_zip(results, fnames=None):
     )
 
 
-def wrap_video_as_zip(video_path):
-    zip_filename = "videos.zip"
+def wrap_video_as_zip(video_path: str) -> StreamingResponse:
+    """
+    Wraps a video file specified by video_path into a zip archive
+    and returns it as a FastAPI StreamingResponse.
 
-    # Create an in-memory buffer to store the zip file
+    Parameters:
+    - video_path: A path to a video file to be zipped.
+
+    Returns: StreamingResponse with a zip archive containing the video file.
+    """
+    zip_filename = "videos.zip"
     buffer = BytesIO()
 
-    # Create a zip file in the buffer
-    with zipfile.ZipFile(buffer, "w") as zipf:
-        # Add the video file to the zip file
-        zipf.write(video_path, arcname="video.mp4")
+    try:
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            # Use basename in case video_path is a full path
+            video_basename = os.path.basename(video_path)
+            zip_file.write(video_path, arcname=video_basename)
 
-    # Set the buffer position to the beginning
-    buffer.seek(0)
+        buffer.seek(0)
 
-    # Return the zip file as a streaming response
-    return StreamingResponse(buffer, media_type="application/zip",
-                             headers={"Content-Disposition": f"attachment; filename={zip_filename}"})
+        return StreamingResponse(
+            buffer, 
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename={zip_filename}"
+            }
+        )
+
+    except FileNotFoundError:
+        # Handle the error when the video file is not found.
+        # Depending on how you want to structure your API, you might want to raise an HTTPException
+        # from fastapi import HTTPException
+        # raise HTTPException(status_code=404, detail="Video not found")
+        raise HTTPException(status_code=404, detail="Error: The file was not found.")
+        # assuming we want to continue in a console-based script
+
+    except zipfile.BadZipFile:
+        # Handle other potential zip file errors.
+        raise HTTPException(status_code=404, detail="Error: Failed to create a zip file.")

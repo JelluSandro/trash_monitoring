@@ -8,7 +8,7 @@ from ultralytics import YOLO
 import cv2
 
 class DetectorSegmentator:
-    def __init__(self, device, weight_path, cls_filter=None, fp16=False):
+    def __init__(self, device, weight_path, cls_filter=None, fp16=False, conf=0.4):
         self.device = device
         self.detector_model = YOLO(weight_path)
         self.detector_model.to(device=self.device)
@@ -17,7 +17,7 @@ class DetectorSegmentator:
         self.predict_args = {
             'show': False,
             'save': False,
-            'conf': 0.4,
+            'conf': conf,
             'save_txt': False,
             'save_crop': False,
             'verbose': False,
@@ -62,7 +62,7 @@ class CansDetector(DetectorSegmentator):
         
 class GarbageSegmentator(DetectorSegmentator):
     def __init__(self, device, fp16=False):
-        super().__init__(device, './weights/yolov8seg-garbage.pt', fp16=fp16)
+        super().__init__(device, './weights/yolov8seg-garbage.pt', fp16=fp16, conf=0.25)
 
 def add_detections_segmentations_on_images(batch: List[np.ndarray],
                                             infos: List,
