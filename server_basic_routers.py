@@ -2,7 +2,7 @@ from typing import List, Annotated
 
 from fastapi import UploadFile, APIRouter, File, Query
 from server_utils import files_to_batch, normilise_batch_cv2
-from core import get_crop_detection_segmentation, add_attributes_in_batch, add_attributes, get_all_detection_by_batch
+from core import get_crop_detection_segmentation, add_attributes, get_all_detection_by_batch
 
 router = APIRouter()
 
@@ -65,6 +65,18 @@ async def get_all_detection_attributes(files: Annotated[List[UploadFile], File(d
                                 True, 
                                 description="Флаг нужно ли детектить мусор"
                             ),
+                            garbageAttribute: bool = Query(
+                                True, 
+                                description="Флаг нужно ли определять мусор"
+                            ),
+                            fullnesAttribute: bool = Query(
+                                True, 
+                                description="Флаг нужно ли определять насколько заполнены контейнеры"
+                            ),
+                            damageAttribute: bool = Query(
+                                True, 
+                                description="Флаг нужно ли определять повреждены ли контейнеры"
+                            ),
                         ):
     """
     Эндпоинт анализирует пакет изображений и возвращает детекции и набор атрибутов для объектов, 
@@ -90,6 +102,9 @@ async def get_all_detection_attributes(files: Annotated[List[UploadFile], File(d
     - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
     - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
     - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
+    - garbageAttribute (bool) = True: если True, будет определять тип мусора.
+    - fullnesAttribute (bool) = True: если True, будет определять заполненость контейнеров.
+    - damageAttribute (bool) = True: если True, будет определять состояние контейнеров.
     
     Каждая детекция - это словарь {'название объекта':[список BBox'ов, Название класса: атрибут]}
 
@@ -99,5 +114,5 @@ async def get_all_detection_attributes(files: Annotated[List[UploadFile], File(d
     """
     batch = await files_to_batch(files, return_fnames=False)
     result = get_all_detection_by_batch(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, save_mask=True)
-    add_attributes(batch, result)
+    add_attributes(batch, result, garbageAttribute, fullnesAttribute, damageAttribute)
     return  {"result": result } 

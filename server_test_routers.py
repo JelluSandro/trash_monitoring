@@ -9,7 +9,6 @@ from server_models import draw_detection_results, add_text_to_image
 from server_utils import files_to_batch, wrap_images_as_zip, wrap_video_as_zip
 
 from core import get_crop_detection_segmentation, add_attributes_in_batch, add_attributes, get_all_detection_by_batch, get_difference_garbage_mask, EmptyResualt, get_compose_mask, find_figures, get_difference
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -27,15 +26,8 @@ def get_compose_mask_and_add_to_list(frame, masks):
     masks.append(composed_mask)
     if len(masks) > 4:
         masks.pop(0)
-    
-
-@router.post("/get-t", tags=["test"])
-async def get_detect_segmentate_and_images(video_file: UploadFile,
-                                           max_frames: int = Query(
-                                                100,
-                                                description="максимальное количество фреймов в видео"
-                                            ),
-                                        ):
+        
+async def video(video_file, max_frames, need_find_disposal=False, detectPeople=False, detectCans=False, detectGraffiti=False, detectGarbage=False, garbageAttribute=False, fullnesAttribute=False, damageAttribute=False):
     try:
         contents = await video_file.read()
     except Exception as e:
@@ -82,24 +74,39 @@ async def get_detect_segmentate_and_images(video_file: UploadFile,
 
         batch_images.append(frame)
         frame_count += 1
-        frame_division = int(fps * 3)
-        if frame_count % frame_division == 0:
-            get_compose_mask_and_add_to_list(frame, masks)
-        elif (frame_count + 10) % frame_division == 0:
-            get_compose_mask_and_add_to_list(frame, masks_shift)
-            if len(masks_shift) == 4:
-                mask_dif = get_difference(masks, masks_shift)
-                if type(mask_dif) != EmptyResualt:
-                    is_detected = is_detected or find_figures(mask_dif)
+        
+        if need_find_disposal:
+            frame_division = int(fps * 3)
+            if frame_count % frame_division == 0:
+                get_compose_mask_and_add_to_list(frame, masks)
+            elif (frame_count + 10) % frame_division == 0:
+                get_compose_mask_and_add_to_list(frame, masks_shift)
+                if len(masks_shift) == 4:
+                    mask_dif = get_difference(masks, masks_shift)
+                    if type(mask_dif) != EmptyResualt:
+                        is_detected = is_detected or find_figures(mask_dif)
             
         if len(batch_images) == 32 or (not ret and len(batch_images) > 0):
-            for image in batch_images:
+            if detectPeople or detectCans or detectGraffiti or detectGarbage:
+                processed_batch = process_batch_images(batch_images, detectPeople, detectCans, detectGraffiti, detectGarbage, garbageAttribute, fullnesAttribute, damageAttribute)
+            else:
+                processed_batch = batch_images
+            for image in processed_batch:
                 result_video.write(add_text_to_image(image, 'Incorrectly disposed garbage detected') if is_detected else image)
             batch_images = []
 
     cap.release()
     result_video.release()
     return wrap_video_as_zip(tmp_file_name)
+
+@router.post("/get-incorrectly-disposed-garbage-detected", tags=["test"])
+async def get_incorrectly_disposed_garbage_detected(video_file: UploadFile,
+                                           max_frames: int = Query(
+                                                100,
+                                                description="максимальное количество фреймов в видео"
+                                            ),
+                                        ):
+    return await video(video_file, max_frames, need_find_disposal=True, detectPeople=False, detectCans=False, detectGraffiti=False, detectGarbage=False)
             
     
 @router.post("/get-detect-segmentate-and-images", tags=["test"])
@@ -171,6 +178,18 @@ async def get_detect_segmentate_attributes_and_images(files: List[UploadFile],
                                             True, 
                                             description="Флаг нужно ли детектить мусор"
                                         ),
+                                        garbageAttribute: bool = Query(
+                                            True, 
+                                            description="Флаг нужно ли определять мусор"
+                                        ),
+                                        fullnesAttribute: bool = Query(
+                                            True, 
+                                            description="Флаг нужно ли определять насколько заполнены контейнеры"
+                                        ),
+                                        damageAttribute: bool = Query(
+                                            True, 
+                                            description="Флаг нужно ли определять повреждены ли контейнеры"
+                                        ),
                                         return_as_zip: bool = Query(
                                             True, 
                                             description="Флаг нужно ли вернуть архив или поток картинок"
@@ -204,13 +223,16 @@ async def get_detect_segmentate_attributes_and_images(files: List[UploadFile],
     - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
     - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
     - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
+    - garbageAttribute (bool) = True: если True, будет определять тип мусора.
+    - fullnesAttribute (bool) = True: если True, будет определять заполненость контейнеров.
+    - damageAttribute (bool) = True: если True, будет определять состояние контейнеров.
     - return_as_zip (bool) = True: нужно ли возвращать ответ как архив или как поток выходных картин
 
     :return: архив или поток картинок
     """
     batch, fnames = await files_to_batch(files, return_fnames=True)
     detection_segmentation_result = get_all_detection_by_batch(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, save_mask=True)
-    add_attributes(batch, detection_segmentation_result, True)
+    add_attributes(batch, detection_segmentation_result, garbageAttribute, fullnesAttribute, damageAttribute, True)
     results = add_detections_segmentations_on_images(batch, detection_segmentation_result, draw_detection_results)
     
     if return_as_zip:
@@ -273,9 +295,9 @@ async def detect_segmentate_crop(files: List[UploadFile],
         return wrap_images_as_zip(results)
     return StreamingResponse(results, media_type="image/png")
     
-def process_batch_images(batch, detectPeople, detectCans, detectGraffiti, detectGarbage):
+def process_batch_images(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, garbageAttribute, fullnesAttribute, damageAttribute):
     detection_segmentation_result = get_all_detection_by_batch(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, save_mask=True)
-    add_attributes(batch, detection_segmentation_result, True)
+    add_attributes(batch, detection_segmentation_result, garbageAttribute, fullnesAttribute, damageAttribute, True)
     return add_detections_segmentations_on_images(batch, detection_segmentation_result, draw_detection_results, False)
     
 
@@ -297,6 +319,18 @@ async def process_video_with_detection_only(video_file: UploadFile,
                                             detectGarbage: bool = Query(
                                                 True, 
                                                 description="Флаг нужно ли детектить мусор"
+                                            ),
+                                            garbageAttribute: bool = Query(
+                                                True, 
+                                                description="Флаг нужно ли определять мусор"
+                                            ),
+                                            fullnesAttribute: bool = Query(
+                                                True, 
+                                                description="Флаг нужно ли определять насколько заполнены контейнеры"
+                                            ),
+                                            damageAttribute: bool = Query(
+                                                True, 
+                                                description="Флаг нужно ли определять повреждены ли контейнеры"
                                             ),
                                             max_frames: int = Query(
                                                 100,
@@ -328,52 +362,13 @@ async def process_video_with_detection_only(video_file: UploadFile,
     - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
     - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
     - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
+    - garbageAttribute (bool) = True: если True, будет определять тип мусора.
+    - fullnesAttribute (bool) = True: если True, будет определять заполненость контейнеров.
+    - damageAttribute (bool) = True: если True, будет определять состояние контейнеров.
     - max_frames (int) = 100: максимальное количество фреймов в видео
     Returns:
 
         Zip файл в котором лежит обработаное видео
     """
-    try:
-        contents = await video_file.read()
-    except:
-        raise HTTPException(status_code=404, detail="Can't read video file. avi type expected")
-    with open('temp_video.avi', 'wb') as temp_file:
-        temp_file.write(contents)
-    
- 
-    try:
-        cap = cv2.VideoCapture('temp_video.avi')
-    except:
-        raise HTTPException(status_code=404, detail="The file was damaged")
-    frame_width = int(cap.get(3))
-    frame_height = int(cap.get(4))
-    size = (frame_width, frame_height)
-    tmp_file_name= 'processed_video.avi'
-    try:
-        result_video = cv2.VideoWriter(tmp_file_name, 
-                                   cv2.VideoWriter_fourcc(*'MJPG'),
-                                   10, size)
-    except:
-        raise HTTPException(status_code=404, detail="Can't write video")
-
-    batch_images = []
-    frame_count = 0
-
-    while True:
-        ret, frame = cap.read()
-        if not ret or frame_count >= max_frames:
-            break
-
-        batch_images.append(frame)
-        frame_count += 1
-
-        if len(batch_images) == 32 or (not ret and len(batch_images) > 0):
-            processed_batch = process_batch_images(batch_images, detectPeople, detectCans, detectGraffiti, detectGarbage)
-            for processed_frame in processed_batch:
-                result_video.write(processed_frame)
-            batch_images = []
-
-    cap.release()
-    result_video.release()
-    return wrap_video_as_zip(tmp_file_name)
+    return await video(video_file, max_frames, False, detectPeople, detectCans, detectGraffiti, detectGarbage, garbageAttribute, fullnesAttribute, damageAttribute)
 

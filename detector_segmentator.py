@@ -8,7 +8,7 @@ from ultralytics import YOLO
 import cv2
 
 class DetectorSegmentator:
-    def __init__(self, device, weight_path, cls_filter=None, fp16=False, conf=0.4):
+    def __init__(self, device, weight_path, cls_filter=None, fp16=False, conf=0.4, iou=0.7):
         self.device = device
         self.detector_model = YOLO(weight_path)
         self.detector_model.to(device=self.device)
@@ -18,11 +18,14 @@ class DetectorSegmentator:
             'show': False,
             'save': False,
             'conf': conf,
+            'iou': iou,
             'save_txt': False,
             'save_crop': False,
             'verbose': False,
             'device': self.device,
-            'half': self.FP16
+            'half': self.FP16,
+            'persist': True,
+            'tracker': "bytetrack.yaml",
         }
         if cls_filter is not None:
             self.dict_names = {k: v for k, v in self.dict_names.items() if k in cls_filter}
@@ -30,7 +33,8 @@ class DetectorSegmentator:
    
     def run(self, batch, save_mask=False):
         self.predict_args['source'] = batch
-        results = self.detector_model.predict(**self.predict_args)
+        #results = self.detector_model.predict(**self.predict_args)
+        results = self.detector_model.track(**self.predict_args)
         out_data = []
         names = self.dict_names.values()
         
@@ -53,7 +57,7 @@ class PersonDetector(DetectorSegmentator):
         super().__init__(device, 'yolov8n.pt', [0], fp16=fp16)
         
 class GraffitiDetector(DetectorSegmentator):
-    def __init__(self, device, fp16=False):
+    def __init__(self, device, fp16=False): 
         super().__init__(device, './weights/yolov8m-graffiti.pt', fp16=fp16)
         
 class CansDetector(DetectorSegmentator):

@@ -37,7 +37,7 @@ class Garbage_model(Resnext101_model):
         
 class Fullness_model(Resnext101_model):
     def __init__(self, device):
-        super().__init__('weights/fullness_weights.pt', ['half', 'empty', 'full'], device)
+        super().__init__('weights/fullness_weights.pt', ['empty', 'half', 'full'], device)
         
 class Damage_model(Resnext101_model):
     def __init__(self, device):

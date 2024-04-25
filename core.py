@@ -20,6 +20,7 @@ def get_crop_detection_segmentation(batch, batch_detections, save=False, crop_on
         for key in dict_of_cls:
             for res in dict_of_cls[key]:
                 box_points = res['box_points']
+                out_img = None
                 if key in cans_names:
                     out_img = crop_cans(pil_img, box_points)
                 elif key in segmentation_names:
@@ -29,7 +30,7 @@ def get_crop_detection_segmentation(batch, batch_detections, save=False, crop_on
                 elif not crop_only_attr:
                     out_img = crop_img(pil_img, box_points)
                 with BytesIO() as output:
-                    if save:
+                    if save and out_img is not None :
                         out_img.save(output, format="PNG")
                     yield output.getvalue()
                     
@@ -40,7 +41,7 @@ def add_attributes_in_batch(batch, model, batch_res, name):
         for ind, res in enumerate(batch_res):
             res[name] = attr[ind]
 
-def add_attributes(batch, batch_detections, save=False):
+def add_attributes(batch, batch_detections, garbageAttribute, fullnesAttribute, damageAttribute, save=False):
     assert len(batch) == len(batch_detections)
     
     croped_batch_cans = []
@@ -52,7 +53,7 @@ def add_attributes(batch, batch_detections, save=False):
         for key in dict_of_cls:
             for res in dict_of_cls[key]:
                 box_points = res['box_points']
-                if key in cans_names:
+                if (fullnesAttribute or damageAttribute) and (key in cans_names):
                     croped_batch_cans.append(crop_cans(pil_img, box_points))
                     croped_batch_cans_res.append(res)
                 elif key in segmentation_names:
@@ -62,10 +63,12 @@ def add_attributes(batch, batch_detections, save=False):
                     if mask is not None and mask.size != 0:
                         croped_batch_seg.append(crop_segmentation(pil_img, box_points, mask))
                         croped_batch_seg_res.append(res)
-                        
-    add_attributes_in_batch(croped_batch_cans, damage_model, croped_batch_cans_res, 'damage')
-    add_attributes_in_batch(croped_batch_cans, fullness_model, croped_batch_cans_res, 'fullness')
-    add_attributes_in_batch(croped_batch_seg, garbage_model, croped_batch_seg_res, 'dirtiness')
+    if damageAttribute:
+        add_attributes_in_batch(croped_batch_cans, damage_model, croped_batch_cans_res, 'damage')
+    if fullnesAttribute:
+        add_attributes_in_batch(croped_batch_cans, fullness_model, croped_batch_cans_res, 'fullness')
+    if garbageAttribute:
+        add_attributes_in_batch(croped_batch_seg, garbage_model, croped_batch_seg_res, 'dirtiness')
     
 class EmptyResualt(Enum):
     ALL = 1
