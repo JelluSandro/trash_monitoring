@@ -1,1 +1,1 @@
-docker build -t fast_api_server_template .
+docker build -t fast_api_server_trash_monitoring .

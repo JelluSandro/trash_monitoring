@@ -37,7 +37,7 @@ def health():
 
 async def run_server():
     config = uvicorn.Config(f"{__name__}:app",
-                            host='0.0.0.0', port=9027,
+                            host='0.0.0.0', port=9131,
                             log_level="info")
     server = uvicorn.Server(config)
     await server.serve()
