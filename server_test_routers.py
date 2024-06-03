@@ -98,19 +98,9 @@ async def video(video_file, max_frames, need_find_disposal=False, detectPeople=F
     cap.release()
     result_video.release()
     return wrap_video_as_zip(tmp_file_name)
-
-@router.post("/get-incorrectly-disposed-garbage-detected", tags=["test"])
-async def get_incorrectly_disposed_garbage_detected(video_file: UploadFile,
-                                           max_frames: int = Query(
-                                                100,
-                                                description="максимальное количество фреймов в видео"
-                                            ),
-                                        ):
-    return await video(video_file, max_frames, need_find_disposal=True, detectPeople=False, detectCans=False, detectGraffiti=False, detectGarbage=False)
-            
     
-@router.post("/get-detect-segmentate-and-images", tags=["test"])
-async def get_detect_segmentate_and_images(files: List[UploadFile],
+@router.post("/detect-and-draw-detection-on-images", tags=["test"])
+async def detect_and_draw_detection_on_images(files: List[UploadFile],
                                         detectPeople: bool = Query(
                                             True, 
                                             description="Флаг нужно ли детектить людей"
@@ -134,23 +124,36 @@ async def get_detect_segmentate_and_images(files: List[UploadFile],
                                     ) \
         -> StreamingResponse:
     """
-    Принимает батч картинок и выдает батч этих же картинок, но на каждой выделены боксы объектов, маска мусора.
+    Принимает на вход фотографии в формате, поддерживающемся библиотекой cv2, архивы формата zip, внутри которых содержатся фотографии подобного типа.
     
-    Во время работы применяет алгоритм детекции, сегментации.
+    Функция обнаруживает на переданных изображениях объекты.
+    Для каждого обнаруженного объекта на переданном изображении рисуется ограничивающая рамка, цвет рамки зависит от типа объекта.
     
-    Каждый из параметров detectPeople, detectCans, detectGraffiti, 
-    и detectGarbage может быть использован для включения или отключения поиска 
-    соответствующих объектов в предоставленных изображениях.
+    * Реклама - Ad - цвет Синий.
+    * Люди - person - цвет Черный.
+    * Граффити - graffiti - цвет Лаймовый.
+    * Мусор - garbage - цвет чайный.
+    * Площадка - Place - цвет Фуксия.
+    * Контейнеры для спец. мусора - Bin - цвет Красный.
+    * Железные контейнеры - Can - цвет Темно-бордовый.
+    * Пластиковые контейнеры - Container - цвет Желтый.
+    * Танкеры - Tank - цвет Оливковый.
+    * Урны - urn - цвет Зеленый.
     
-    Args:
-    - files (List[UploadFile]): список загружаемых файлов изображений для анализа.
-    - detectCans (bool) = True: если True, будет пытаться обнаружить ['garbage', 'Ad', 'Place', 'Bin', 'Can', 'Container', 'Tank', 'urn'].
-    - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
-    - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
-    - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
-    - return_as_zip (bool) = True: нужно ли возвращать ответ как архив или как поток выходных картин
-
-    :return: архив или поток картинок
+    Каждый из параметров detectPeople, detectCans, detectGraffiti и detectGarbage может быть использован для включения или отключения поиска соответствующих объектов в предоставленных изображениях.
+    
+    ### Аргументы:
+    
+    * **files** (List[UploadFile]): список загружаемых файлов изображений для анализа.
+    * **detectCans** (bool) = True: если True, будет пытаться обнаружить следующие объекты: контейнеры, площадки, объявления.
+    * **detectGraffiti** (bool) = True: если True, будет пытаться обнаружить граффити.
+    * **detectGarbage** (bool) = True: если True, будет пытаться обнаружить мусор.
+    * **detectPeople** (bool) = True: если True, будет пытаться обнаружить людей.
+    * **return_as_zip** (bool) = True: нужно ли возвращать ответ как архив или как поток выходных картин.
+    
+    ### Возвращаемое значение:
+    
+    Архив или поток картинок, на которых выделены ограничивающими рамками найденные объекты.
     """
     batch, fnames = await files_to_batch(files, return_fnames=True)
     out_data = get_all_detection_by_batch(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, save_mask=True)
@@ -160,8 +163,8 @@ async def get_detect_segmentate_and_images(files: List[UploadFile],
         return wrap_images_as_zip(results, fnames)
     return StreamingResponse(results, media_type="image/png")
 
-@router.post("/get-detect-segmentate-attributes-and-images", tags=["test"])
-async def get_detect_segmentate_attributes_and_images(files: List[UploadFile],
+@router.post("/detect-classify-сontainerStatus-containerFilling-garbageType-and-draw-on-image", tags=["test"])
+async def detect_classify_сontainerStatus_containerFilling_garbageType_and_draw_on_image(files: List[UploadFile],
                                         detectPeople: bool = Query(
                                             True, 
                                             description="Флаг нужно ли детектить людей"
@@ -178,15 +181,15 @@ async def get_detect_segmentate_attributes_and_images(files: List[UploadFile],
                                             True, 
                                             description="Флаг нужно ли детектить мусор"
                                         ),
-                                        garbageAttribute: bool = Query(
+                                        garbageType: bool = Query(
                                             True, 
                                             description="Флаг нужно ли определять мусор"
                                         ),
-                                        fullnesAttribute: bool = Query(
+                                        containerFilling: bool = Query(
                                             True, 
                                             description="Флаг нужно ли определять насколько заполнены контейнеры"
                                         ),
-                                        damageAttribute: bool = Query(
+                                        containerStatus: bool = Query(
                                             True, 
                                             description="Флаг нужно ли определять повреждены ли контейнеры"
                                         ),
@@ -197,42 +200,63 @@ async def get_detect_segmentate_attributes_and_images(files: List[UploadFile],
                                     ) \
         -> StreamingResponse:
     """
-    Принимает батч картинок и выдает батч этих же картинок, но на каждой выделены боксы объектов, маска мусора и добавлены иконки атрибутов.
+    Принимает на вход фотографии в формате, поддерживающемся библиотекой cv2, архивы формата zip внутри которых содержатся фотографии подобного типа.
     
-    Во время работы применяет алгоритм детекции, сегментации и классификации.
+    Функция обнаруживает на переданных изображениях объекты.
+    Для каждого обнаруженного объекта на переданном изображении рисуется ограничивающая рамка, цвет рамки зависит от типа объекта.
+    В зависимости от класса объекта в правом верхнем углу ограничивающей рамки рисуется иконка класса.
+    
+    * Реклама - Ad - цвет Синий.
+    * Люди - person - цвет Черный.
+    * Граффити - graffiti - цвет Лаймовый.
+    * Мусор - garbage - цвет чайный.
+    * Площадка - Place - цвет Фуксия.
+    * Контейнеры для спец. мусора - Bin - цвет Красный.
+    * Железные контейнеры - Can - цвет Темно-бордовый.
+    * Пластиковые контейнеры - Container - цвет Желтый.
+    * Танкеры - Tank - цвет Оливковый.
+    * Урны - urn - цвет Зеленый.
 
-    Каждый из параметров detectPeople, detectCans, detectGraffiti, 
-    и detectGarbage может быть использован для включения или отключения поиска 
-    соответствующих объектов в предоставленных изображениях.
-    
-    Контейнеры для мусора имеют следующие атрибуты:
-    Классфикация по принципу повреждений ['broken', 'flipped', 'ok']
-        broken - найдены сильные повреждения на контейнере.
-        flipped - перевернут.
-    Классфикация по принципу наполенености мусором ['full', 'half', 'empty']
-        
-    Мусор имеют следующие атрибуты:
-    Классфикация по степени замусоренности ['TKO', 'KGO', 'bulk']
-        TKO - мелкий мусор.
-        KGO - крупногабаритные отходы -  твердые коммунальные отходы, размер которых не позволяет осуществить их складирование в контейнерах.
-        Bulk - навал мусора -  скопление твердых бытовых отходов и крупногабаритного мусора, по объему, не превышающему 1 м3.
-    
-    Args:
-    - files (List[UploadFile]): список загружаемых файлов изображений для анализа.
-    - detectCans (bool) = True: если True, будет пытаться обнаружить ['garbage', 'Ad', 'Place', 'Bin', 'Can', 'Container', 'Tank', 'urn'].
-    - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
-    - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
-    - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
-    - garbageAttribute (bool) = True: если True, будет определять тип мусора.
-    - fullnesAttribute (bool) = True: если True, будет определять заполненость контейнеров.
-    - damageAttribute (bool) = True: если True, будет определять состояние контейнеров.
-    - return_as_zip (bool) = True: нужно ли возвращать ответ как архив или как поток выходных картин
+    Функция распознаёт контейнеры и относит их к одной из следующих категорий:
 
-    :return: архив или поток картинок
+    * нормальное состояние — ok - контейнер цел и не имеет видимых повреждений.
+    * сильные повреждения — broken - на контейнере есть значительные дефекты, которые могут повлиять на его целостность.
+    * перевёрнут — flipped - контейнер находится в перевёрнутом положении.
+
+    Также функция определяет степень заполненности контейнера:
+
+    * пустой — empty - контейнер не содержит мусора.
+    * есть место — half - контейнер заполнен, но есть место для нового мусора.
+    * заполнен — full - в контейнере нет места для нового мусора.
+  
+    Функция определяет вид мусора:
+    
+    * мелкий мусор - TKO.
+    * крупногабаритные отходы — KGO — твёрдые коммунальные отходы, размер которых не позволяет осуществить их складирование в контейнерах.
+    * навал мусора - Bulk - скопление твердых бытовых отходов и крупногабаритного мусора, по объему, не превышающему 1 м3. 
+    
+    Каждый из параметров detectPeople, detectCans, detectGraffiti и detectGarbage может быть использован для включения или отключения поиска соответствующих объектов в предоставленных изображениях.
+    
+    Каждый из параметров garbageType, containerFilling, containerStatus может быть использован для включения или отключения поиска соответствующих аттрибутов в предоставленных изображениях.
+    
+    ### Аргументы:
+    
+    * **files** (List[UploadFile]): список загружаемых файлов изображений для анализа.
+    * **detectCans** (bool) = True: если True, будет пытаться обнаружить следующие объекты: контейнеры, площадки, объявления.
+    * **detectGraffiti** (bool) = True: если True, будет пытаться обнаружить граффити.
+    * **detectGarbage** (bool) = True: если True, будет пытаться обнаружить мусор.
+    * **detectPeople** (bool) = True: если True, будет пытаться обнаружить людей.
+    * **garbageType** (bool) = True: если True, будет определять тип мусора.
+    * **containerFilling** (bool) = True: если True, будет определять заполненность контейнеров.
+    * **containerStatus** (bool) = True: если True, будет определять состояние контейнеров.
+    
+    ### Возвращаемое значение:
+    
+    Архив или поток картинок.
     """
     batch, fnames = await files_to_batch(files, return_fnames=True)
     detection_segmentation_result = get_all_detection_by_batch(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, save_mask=True)
-    add_attributes(batch, detection_segmentation_result, garbageAttribute, fullnesAttribute, damageAttribute, True)
+    add_attributes(batch, detection_segmentation_result, garbageType, containerFilling, containerStatus, True)
     results = add_detections_segmentations_on_images(batch, detection_segmentation_result, draw_detection_results)
     
     if return_as_zip:
@@ -240,7 +264,7 @@ async def get_detect_segmentate_attributes_and_images(files: List[UploadFile],
     return StreamingResponse(results, media_type="image/png")
     
 @router.post("/detect-segmentate-crop", tags=["test"])
-async def detect_segmentate_crop(files: List[UploadFile],
+async def get_extracted_objects_from_images(files: List[UploadFile],
                                         detectPeople: bool = Query(
                                             True, 
                                             description="Флаг нужно ли детектить людей"
@@ -263,30 +287,37 @@ async def detect_segmentate_crop(files: List[UploadFile],
                                         ),
                                     ):
     """
-    Принимает батч картинок и выдает список вырезанных детекций и сегментаций.
+    Принимает на вход фотографии в формате, поддерживающемся библиотекой cv2, архивы формата zip внутри которых содержатся фотографии подобного типа.
     
-    Каждый из параметров detectPeople, detectCans, detectGraffiti, 
-    и detectGarbage может быть использован для включения или отключения поиска 
-    соответствующих объектов в предоставленных изображениях.
+    Функция вырезает объекты и маски из изображения и возвращает их в виде архива или потока картинок.
     
-    Args:
-    - files (List[UploadFile]): список загружаемых файлов изображений для анализа.
-    - detectCans (bool) = True: если True, будет пытаться обнаружить ['garbage', 'Ad', 'Place', 'Bin', 'Can', 'Container', 'Tank', 'urn'].
-    - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
-    - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
-    - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
-    - return_as_zip (bool) = True: нужно ли возвращать ответ как архив или как поток выходных картинок.
+    Вырезаемые объекты: 
+    
+    * Граффити - graffiti.
+    * Реклама - Ad.
+    * Люди - person.
+    * Мусор - garbage.
+    * Контейнерная площадка - Place.
+    * Контейнеры для спец. мусора - Bin.
+    * Железные контейнеры - Can.
+    * Пластиковые контейнеры - Container.
+    * Танкеры - Tank.
+    * Урны - urn.
+    
+    Каждый из параметров detectPeople, detectCans, detectGraffiti и detectGarbage может быть использован для включения или отключения поиска соответствующих объектов в предоставленных изображениях.
+    
 
-    Во время работы применяет алгоритм детекции и сегментации.
-
-    Args:
-        files: батч картинок
-
-        return_as_zip: нужно ли возвращать ответ как архив или как поток выходных картинок.
-        По умолчанию return_as_zip=True.
-
-    Returns:
-        res: архив или поток картинок
+    ### Аргументы:
+    
+    * **files** (List[UploadFile]): список загружаемых файлов изображений для анализа.
+    * **detectCans** (bool) = True: если True, будет пытаться обнаружить следующие объекты: контейнеры, площадки, объявления.
+    * **detectGraffiti** (bool) = True: если True, будет пытаться обнаружить граффити.
+    * **detectGarbage** (bool) = True: если True, будет пытаться обнаружить мусор.
+    * **detectPeople** (bool) = True: если True, будет пытаться обнаружить людей.
+        
+    ### Возвращаемое значение:
+    
+    Архив или поток картинок.
     """
     batch = await files_to_batch(files, return_fnames=False)
     result = get_all_detection_by_batch(batch, detectPeople, detectCans, detectGraffiti, detectGarbage, save_mask=True)
@@ -302,8 +333,8 @@ def process_batch_images(batch, detectPeople, detectCans, detectGraffiti, detect
     
 
     
-@router.post("/process-video-with-detection-only", tags=["test"])
-async def process_video_with_detection_only(video_file: UploadFile,
+@router.post("/process-video-detect-classify-and-draw", tags=["test"])
+async def process_video_detect_classify_and_draw(video_file: UploadFile,
                                             detectPeople: bool = Query(
                                                 True, 
                                                 description="Флаг нужно ли детектить людей"
@@ -320,15 +351,15 @@ async def process_video_with_detection_only(video_file: UploadFile,
                                                 True, 
                                                 description="Флаг нужно ли детектить мусор"
                                             ),
-                                            garbageAttribute: bool = Query(
+                                            garbageType: bool = Query(
                                                 True, 
                                                 description="Флаг нужно ли определять мусор"
                                             ),
-                                            fullnesAttribute: bool = Query(
+                                            containerFilly: bool = Query(
                                                 True, 
                                                 description="Флаг нужно ли определять насколько заполнены контейнеры"
                                             ),
-                                            damageAttribute: bool = Query(
+                                            containerStatus: bool = Query(
                                                 True, 
                                                 description="Флаг нужно ли определять повреждены ли контейнеры"
                                             ),
@@ -338,37 +369,87 @@ async def process_video_with_detection_only(video_file: UploadFile,
                                             ),
                                         ):
     """
-    Принимает видео и максимальное количество фреймов и выдает видео на котором выделены объекты, маски и указана классификация объектов.
+    Принимает видео и максимальное количество фреймов и выдает видео на котором выделены объекты, маски и классы объектов.
     
-    Каждый из параметров detectPeople, detectCans, detectGraffiti, 
-    и detectGarbage может быть использован для включения или отключения поиска 
-    соответствующих объектов в предоставленных изображениях.
+    Функция обнаруживает на изображениях такие объекты как: 
     
-    Контейнеры для мусора имеют следующие атрибуты:
-    Классфикация по принципу повреждений ['broken', 'flipped', 'ok']
-        broken - найдены сильные повреждения на контейнере.
-        flipped - перевернут.
-    Классфикация по принципу наполенености мусором ['full', 'half', 'empty']
-        
-    Мусор имеют следующие атрибуты:
-    Классфикация по степени замусоренности ['TKO', 'KGO', 'bulk']
-        TKO - мелкий мусор.
-        KGO - крупногабаритные отходы -  твердые коммунальные отходы, размер которых не позволяет осуществить их складирование в контейнерах.
-        Bulk - навал мусора -  скопление твердых бытовых отходов и крупногабаритного мусора, по объему, не превышающему 1 м3.
+    * Граффити - graffiti.
+    * Реклама - Ad.
+    * Люди - person.
+    * Мусор - garbage.
+    * Контейнерная площадка - Place.
+    * Контейнеры для спец. мусора - Bin.
+    * Железные контейнеры - Can.
+    * Пластиковые контейнеры - Container.
+    * Танкеры - Tank.
+    * Урны - urn.
     
-    Args:
-    - video_file (UploadFile): видео в формате avi.
-    - detectCans (bool) = True: если True, будет пытаться обнаружить ['garbage', 'Ad', 'Place', 'Bin', 'Can', 'Container', 'Tank', 'urn'].
-    - detectGraffiti (bool) = True: если True, будет пытаться обнаружить ['graffiti'].
-    - detectGarbage (bool) = True: если True, будет пытаться обнаружить ['garbage'].
-    - detectPeople (bool) = True: если True, будет пытаться обнаружить ['person'].
-    - garbageAttribute (bool) = True: если True, будет определять тип мусора.
-    - fullnesAttribute (bool) = True: если True, будет определять заполненость контейнеров.
-    - damageAttribute (bool) = True: если True, будет определять состояние контейнеров.
-    - max_frames (int) = 100: максимальное количество фреймов в видео
-    Returns:
+    Функция распознаёт контейнеры и относит их к одной из следующих категорий:
 
-        Zip файл в котором лежит обработаное видео
+    * нормальное состояние — ok - контейнер цел и не имеет видимых повреждений.
+    * сильные повреждения — broken - на контейнере есть значительные дефекты, которые могут повлиять на его целостность.
+    * перевёрнут — flipped - контейнер находится в перевёрнутом положении.
+
+    Также функция определяет степень заполненности контейнера:
+
+    * пустой — empty - контейнер не содержит мусора.
+    * есть место — half - контейнер заполнен, но есть место для нового мусора.
+    * заполнен — full - в контейнере нет места для нового мусора.
+  
+    Функция определяет вид мусора:
+    
+    * мелкий мусор - TKO.
+    * крупногабаритные отходы — KGO — твёрдые коммунальные отходы, размер которых не позволяет осуществить их складирование в контейнерах.
+    * навал мусора - Bulk - скопление твердых бытовых отходов и крупногабаритного мусора, по объему, не превышающему 1 м3. 
+
+    Каждый из параметров detectPeople, detectCans, detectGraffiti и detectGarbage может быть использован для включения или отключения поиска соответствующих объектов в предоставленных изображениях.
+    
+    Каждый из параметров garbageType, containerFilling, сontainerStatus может быть использован для включения или отключения поиска соответствующих аттрибутов в предоставленных изображениях.
+
+    ### Аргументы:
+    
+    * **video_file** (UploadFile): видео в формате avi.
+    * **detectCans** (bool) = True: если True, будет пытаться обнаружить следующие объекты: контейнеры, площадки, объявления.
+    * **detectGraffiti** (bool) = True: если True, будет пытаться обнаружить граффити.
+    * **detectGarbage** (bool) = True: если True, будет пытаться обнаружить  мусор.
+    * **detectPeople** (bool) = True: если True, будет пытаться обнаружить людей.
+    * **garbageType** (bool) = True: если True, будет определять тип мусора.
+    * **containerFilly** (bool) = True: если True, будет определять заполненность контейнеров.
+    * **containerStatus** (bool) = True: если True, будет определять состояние контейнеров.
+    * **max_frames** (int) = 100: максимальное количество фреймов в видео
+    
+    ### Возвращаемое значение:
+
+    Zip файл в котором лежит обработанное видео.
     """
-    return await video(video_file, max_frames, False, detectPeople, detectCans, detectGraffiti, detectGarbage, garbageAttribute, fullnesAttribute, damageAttribute)
+    return await video(video_file, max_frames, False, detectPeople, detectCans, detectGraffiti, detectGarbage, garbageType, containerFilly, containerStatus)
 
+
+@router.post("/detect-incorrectly-disposed-garbage", tags=["test"])
+async def detect_incorrectly_disposed_garbage(video_file: UploadFile,
+                                           max_frames: int = Query(
+                                                100,
+                                                description="максимальное количество фреймов в видео"
+                                            ),
+                                        ):
+    """
+    Функция обнаруживает и маркирует неправильно выброшенный мусор.
+
+    Функция принимает видео или видеопоток в качестве входных данных и возвращает обработанные данные.
+
+    В процессе обработки данных программа анализирует видео на предмет неправильно выброшенного мусора. 
+    Если программа обнаруживает такой случай, то в правом верхнем углу видео добавляется надпись 
+    *incorrectly disposed garbage detected*. Надпись появляется в тот момент, когда программа считает, что произошло неправильное выбрасывание мусора.
+
+    Если неправильно выброшенный мусор не обнаружен, то функция возвращает исходное видео без изменений.
+        
+    ### Аргументы:
+    
+    * **video_file** (UploadFile): видео в формате avi.
+    * **max_frames** (int) = 100: максимальное количество фреймов в видео
+        
+    ### Возвращаемое значение:
+    
+    Zip файл в котором лежит обработанное видео.
+    """
+    return await video(video_file, max_frames, need_find_disposal=True, detectPeople=False, detectCans=False, detectGraffiti=False, detectGarbage=False)

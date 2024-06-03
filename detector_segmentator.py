@@ -54,7 +54,7 @@ class DetectorSegmentator:
 
 class PersonDetector(DetectorSegmentator):
     def __init__(self, device, fp16=False):
-        super().__init__(device, 'yolov8n.pt', [0], fp16=fp16)
+        super().__init__(device, './weights/yolov8n.pt', [0], fp16=fp16)
         
 class GraffitiDetector(DetectorSegmentator):
     def __init__(self, device, fp16=False): 
